@@ -1377,7 +1377,7 @@ class TwitterController < BaseController
     multi_delimiter = "./."
 
     text.split(multi_delimiter).each do |part|
-      new_dm = @rest_client.direct_message_create(recipient, part)
+      new_dm = @rest_client.create_direct_message(recipient, part)
       @last_dm_transact << ['dm', new_dm.id]
     end
   end
