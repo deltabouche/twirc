@@ -1,0 +1,10 @@
+source 'https://rubygems.org'
+gem "twitter"
+gem "oauth"
+gem "hashie"
+gem "parse-ruby-client"
+gem "htmlentities"
+gem "loofah"
+gem "rails"
+gem "andand"
+gem "dotenv"
