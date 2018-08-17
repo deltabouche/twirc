@@ -555,66 +555,56 @@ class TwitterController < BaseController
   end
 
   def process_event owner, channel, object, show_timestamp = false, show_muted = false
-    case object
-    when Twitter::Streaming::DeletedTweet
-      parent_tweet = get_tweet_from_cache object.id
-      if parent_tweet
-        twitter_user = get_twitter_user_from_tweet parent_tweet
-        cursor_text = get_cursor_text_from_tweet parent_tweet
-        render_tweet_standard(channel, cursor_text, show_timestamp, parent_tweet, twitter_user, "deleted ", true, show_muted)
+    event_name, entity = object
+    case event_name
+    when :delete
+      twitter_user = get_twitter_user_from_tweet entity
+      cursor_text = get_cursor_text_from_tweet entity
+      render_tweet_standard(channel, cursor_text, show_timestamp, entity, twitter_user, "deleted ", true, show_muted)
+    when :favorite
+      cid, parent_tweet = get_cache_id_and_entry entity.target_object
+      twitter_user = get_twitter_user_from_tweet parent_tweet
+      source_user = get_twitter_user_from_user_object object.source
+      cursor_text = get_cursor_text_from_tweet parent_tweet, cid
+      render_tweet show_timestamp, channel, source_user, "#{liked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
+    when :unfavorite
+      cid, parent_tweet = get_cache_id_and_entry entity.target_object
+      twitter_user = get_twitter_user_from_tweet parent_tweet
+      source_user = get_twitter_user_from_user_object object.source
+      cursor_text = get_cursor_text_from_tweet parent_tweet, cid
+      render_tweet show_timestamp, channel, source_user, "#{unliked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
+    when :follow
+      follower = get_twitter_user_from_user_object this_user
+      target = get_twitter_user_from_user_object entity
+
+      if follower.nick.downcase == owner.nick.downcase
+        chuser = channel.join_user target
+        channel.set_mode_to_user owner.control_user, chuser, ["h"] if target.twitter_user.protected?
+        channel.set_mode_to_user owner.control_user, chuser, ["v"] if @followers.include?(target.twitter_user.id)
+      else
+        chuser = channel.user_for_user follower
+        @followers << follower.twitter_user.id if !@followers.include?(follower.twitter_user.id)
+        channel.set_mode_to_user owner.control_user, chuser, ["v"] if channel.users.include?(follower)
       end
 
-    when Twitter::Streaming::Event
-      case object.name
-      when :favorite          
-        cid, parent_tweet = get_cache_id_and_entry object.target_object
-        twitter_user = get_twitter_user_from_tweet parent_tweet
-        source_user = get_twitter_user_from_user_object object.source
-        cursor_text = get_cursor_text_from_tweet parent_tweet, cid
-        render_tweet show_timestamp, channel, source_user, "#{liked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
-      when :unfavorite
-        cid, parent_tweet = get_cache_id_and_entry object.target_object
-        twitter_user = get_twitter_user_from_tweet parent_tweet
-        source_user = get_twitter_user_from_user_object object.source
-        cursor_text = get_cursor_text_from_tweet parent_tweet, cid
-        render_tweet show_timestamp, channel, source_user, "#{unliked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
-      when :follow
-        follower = get_twitter_user_from_user_object object.source
-        target = get_twitter_user_from_user_object object.target
+      channel.action follower, "is now following #{target.nick}" if !@prefs["hide_follow"] || follower.nick.downcase == owner.nick.downcase
+    when :unfollow
+      follower = get_twitter_user_from_user_object this_user
+      target = get_twitter_user_from_user_object entity
 
-        if follower.nick.downcase == owner.nick.downcase
-          chuser = channel.join_user target
-          channel.set_mode_to_user owner.control_user, chuser, ["h"] if target.twitter_user.protected?
-          channel.set_mode_to_user owner.control_user, chuser, ["v"] if @followers.include?(target.twitter_user.id)
-        else
-          chuser = channel.user_for_user follower
-          @followers << follower.twitter_user.id if !@followers.include?(follower.twitter_user.id)
-          channel.set_mode_to_user owner.control_user, chuser, ["v"] if channel.users.include?(follower)
-        end
+      channel.action follower, "stopped following #{target.nick}"
 
-        channel.action follower, "is now following #{target.nick}" if !@prefs["hide_follow"] || follower.nick.downcase == owner.nick.downcase
-      when :unfollow
-        follower = get_twitter_user_from_user_object object.source
-        target = get_twitter_user_from_user_object object.target
-
-        channel.action follower, "stopped following #{target.nick}"
-
-        if follower.nick.downcase == owner.nick.downcase
-          channel.kick_user owner.control_user, target, "Get outta here!"
-        else
-          chuser = channel.user_for_user follower
-          @followers.delete(follower.twitter_user.id) if @followers.include?(follower.twitter_user.id)
-          channel.set_mode_to_user owner.control_user, chuser, [], ["v"] if chuser
-        end
-      when :quoted_tweet
-        fuck = @rest_client.status(object.target.id, tweet_mode: 'extended')
-        render_tweet_quick channel, fuck, show_timestamp, show_muted
+      if follower.nick.downcase == owner.nick.downcase
+        channel.kick_user owner.control_user, target, "Get outta here!"
+      else
+        chuser = channel.user_for_user follower
+        @followers.delete(follower.twitter_user.id) if @followers.include?(follower.twitter_user.id)
+        channel.set_mode_to_user owner.control_user, chuser, [], ["v"] if chuser
       end
-    when Twitter::Tweet
-      fuck = @rest_client.status(object.id, tweet_mode: 'extended')
-      render_tweet_quick channel, fuck, show_timestamp, show_muted
-    when Twitter::DirectMessage
-      render_dm show_timestamp, object
+    when :quote_tweet
+      render_tweet_quick channel, entity, show_timestamp, show_muted
+    when :tweet
+      render_tweet_quick channel, entity, show_timestamp, show_muted
     end
   end
 
@@ -636,7 +626,7 @@ class TwitterController < BaseController
     end
   end
 
-  def post_update(text, mentions = nil, opts = {})
+  def post_update(channel, text, mentions = nil, opts = {})
     text = text.strip
     prefix = opts[:prefix] || ""
     @last_transact = []
@@ -663,6 +653,8 @@ class TwitterController < BaseController
       if new_tweet
         @last_id = new_tweet.id
         @last_transact << ['update', new_tweet.id]
+
+        process_event owner, channel, [:tweet, new_tweet]
       else
         raise "Unable to post tweet #{final_text.split("\n").first}"
       end
@@ -682,34 +674,23 @@ class TwitterController < BaseController
     @thread = Thread.new do
       first = the_first
       begin
+        populate_followers(channel)
         while true
-          @stream_client.user(tweet_mode: 'extended') do |object|
-            if owner.should_die
-              raise ShouldDieError, "Stream should die"
-            end
-            begin
-              case object
-              when Twitter::Streaming::FriendList
-                after_stream_connect(channel, first, object)
-              else
-                process_event owner, channel, object
-                if object.is_a?(Twitter::Tweet) && object.id
-                  @last_received_tweet_id = object.id
-                end
-              end
-            rescue => e
-              channel.msg owner.control_user, "BIG ERROR! #{e.message}"
-            end
+          begin
+            after_stream_connect(channel, first)
+            first = false
+          rescue => e
+            channel.msg owner.control_user, "MASSIVE ERROR! #{e.message}"
           end
-          channel.msg owner.control_user, "Disconnected from stream, reconnecting..."
+          sleep 75
         end
-      rescue ShouldDieError => e
-        puts "Stream will die now..."
+      rescue => e
+        channel.msg owner.control_user, "CONNECT ERROR! #{e.message}"
       end
     end
   end
 
-  def after_stream_connect(channel, first, object)
+  def populate_followers(channel)
     begin
       followers = @rest_client.follower_ids
       followers.each do |f|
@@ -718,7 +699,8 @@ class TwitterController < BaseController
     rescue => e
       #can't retrieve followers for now.. oh well!
     end
-    friends = @rest_client.users(object)
+    friend_ids = @rest_client.friend_ids
+    friends = @rest_client.users(friend_ids)
     friends.each do |f|
       twitter_user = get_twitter_user_by_screen_name f.screen_name
       puts "#{f.screen_name}"
@@ -735,6 +717,9 @@ class TwitterController < BaseController
 
       channel.add_user twitter_user, modes
     end
+  end
+
+  def after_stream_connect(channel, first)
 
     if first
       channel.join_owner owner
@@ -748,7 +733,7 @@ class TwitterController < BaseController
       channel.msg owner.control_user, "-End of Backlog-"
       first = false
     else
-      channel.msg owner.control_user, "Fetching gap"
+      # channel.msg owner.control_user, "Fetching gap"
       if @last_received_tweet_id
         timeline = @rest_client.home_timeline(count: 200, since_id: @last_received_tweet_id, tweet_mode: 'extended') + @rest_client.mentions_timeline(count: 200, since_id: @last_received_tweet_id, tweet_mode: 'extended') + @rest_client.retweets_of_me(count: 100, since_id: @last_received_tweet_id, tweet_mode: 'extended')
       else
@@ -759,9 +744,9 @@ class TwitterController < BaseController
         process_event owner, channel, obj, true
         @last_received_tweet_id = obj.id if obj.id
       end
-      channel.msg owner.control_user, "-End of gap-"
+      # channel.msg owner.control_user, "-End of gap-"
 
-      channel.msg owner.control_user, "Stream reconnected."
+      # channel.msg owner.control_user, "Stream reconnected."
     end
   end
 
@@ -820,30 +805,12 @@ class TwitterController < BaseController
         end
       end
 
-      cmd_help = ["", "Restart the stream (if you think it died)", false]
-      channel.on_command cmd_help, "ref" do |c, owner, args|
-        if @thread
-          channel.msg owner.control_user, "Killing existing stream."
-          @thread.kill
-        end
-        channel.msg owner.control_user, "Reconnecting stream..."
-        start_thread channel, false
-      end
-
-      cmd_help = ["", "Forcibly kill the stream (why?)", true]
-      channel.on_command cmd_help, "kill" do |c, owner, args|
-        if @thread
-          channel.msg owner.control_user, "Killing existing stream."
-          @thread.kill
-        end
-      end
-
       cmd_help = ["<text>", "Post a tweet", false]
       channel.on_command cmd_help, "post", "p" do |c, owner, args|
         if args.strip.size == 0
           raise "You didn't enter any text!"
         else
-          post_update args
+          post_update channel, args
         end
       end
 
@@ -852,7 +819,7 @@ class TwitterController < BaseController
         if args.strip.size == 0
           raise "You didn't enter any text!"
         else
-          post_update args, nil, prefix: "."
+          post_update channel, args, nil, prefix: "."
         end
       end
 
@@ -864,7 +831,7 @@ class TwitterController < BaseController
           if @last_id.nil?
             raise "No tweet to extend!"
           else
-            post_update args, @last_mens, in_reply_to_status_id: @last_id, prefix: @last_prefix
+            post_update channel, args, @last_mens, in_reply_to_status_id: @last_id, prefix: @last_prefix
           end
         end
       end
@@ -879,6 +846,7 @@ class TwitterController < BaseController
               rts = @rest_client.retweet(tweet.id)
               rts.each do |rt|
                 @last_transact << ['rt', rt.retweet.id]
+                process_event owner, channel, [:tweet, new_tweet]
               end
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
@@ -896,6 +864,7 @@ class TwitterController < BaseController
             cache_id, tweet = extract_cache_id_from_number_or_url i
             if tweet
               @rest_client.destroy_status(tweet.id)
+              process_event owner, channel, [:delete, tweet], true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -941,8 +910,11 @@ class TwitterController < BaseController
         @last_transact = []
         args.split(" ").each do |i|
           begin
-            @rest_client.follow(i)
+            f_users = @rest_client.follow(i)
             @last_transact << ['follow', i]
+            f_users.each do |f_user|
+              process_event owner, channel, [:follow, f_user], true
+            end
           rescue => e
             channel.msg owner.control_user, "ERROR! #{e.message}"
           end
@@ -953,7 +925,10 @@ class TwitterController < BaseController
       channel.on_command cmd_help, "unfollow" do |c, owner, args|
         args.split(" ").each do |i|
           begin
-            @rest_client.unfollow(i)
+            f_users = @rest_client.unfollow(i)
+            f_users.each do |f_user|
+              process_event owner, channel, [:follow, f_user], true
+            end
           rescue => e
             channel.msg owner.control_user, "ERROR! #{e.message}"
           end
@@ -1079,9 +1054,11 @@ class TwitterController < BaseController
               rts = @rest_client.retweet(tweet.id)
               rts.each do |rt|
                 @last_transact << ['rt', rt.id]
+                process_event owner, channel, [:tweet, rt]
               end
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
+              process_event owner, channel, [:favorite, tweet], true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -1100,9 +1077,12 @@ class TwitterController < BaseController
             if tweet
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
+              process_event owner, channel, [:favorite, tweet], true
+
               rts = @rest_client.retweet(tweet.id)
               rts.each do |rt|
                 @last_transact << ['rt', rt.id]
+                process_event owner, channel, [:tweet, rt]
               end
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
@@ -1122,6 +1102,7 @@ class TwitterController < BaseController
             if tweet
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
+              process_event owner, channel, [:favorite, tweet], true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -1138,6 +1119,7 @@ class TwitterController < BaseController
             cache_id, tweet = extract_cache_id_from_number_or_url i
             if tweet
               @rest_client.unfavorite(tweet.id)
+              process_event owner, channel, [:unfavorite, tweet], true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -1158,7 +1140,7 @@ class TwitterController < BaseController
             recipient = get_preferred_recipient_from_tweet tweet
             mentions = nil
             mentions = "@#{recipient}" unless recipient.nil?
-            post_update args, mentions, {in_reply_to_status_id: tweet.id}
+            post_update channel, args, mentions, {in_reply_to_status_id: tweet.id}
           else
             raise "Tweet #{cache_id_display cache_id} doesn't exist"
           end
@@ -1173,7 +1155,7 @@ class TwitterController < BaseController
         else
           cache_id, tweet = extract_cache_id_from_number_or_url i
           if tweet
-            post_update args, nil, {in_reply_to_status_id: tweet.id}
+            post_update channel, args, nil, {in_reply_to_status_id: tweet.id}
           else
             raise "Tweet #{cache_id_display cache_id} doesn't exist"
           end
@@ -1192,7 +1174,7 @@ class TwitterController < BaseController
             mentions = mentions.select { |m| m.downcase != owner.nick.downcase }.uniq.compact
             mentions = mentions.map { |m| "@#{m}" }.join(" ").strip
             mentions = nil if mentions.strip.size == 0
-            post_update args, mentions, {in_reply_to_status_id: tweet.id}
+            post_update channel, args, mentions, {in_reply_to_status_id: tweet.id}
           else
             raise "Tweet #{cache_id_display cache_id} doesn't exist"
           end
@@ -1210,7 +1192,7 @@ class TwitterController < BaseController
             recipient = get_preferred_recipient_from_tweet tweet
             mentions = nil
             mentions = "@#{recipient}" unless recipient.nil?
-            post_update args, mentions, {in_reply_to_status_id: tweet.id, prefix: "."}
+            post_update channel, args, mentions, {in_reply_to_status_id: tweet.id, prefix: "."}
           else
             raise "Tweet #{cache_id_display cache_id} doesn't exist"
           end
@@ -1229,7 +1211,7 @@ class TwitterController < BaseController
             mentions = mentions.select { |m| m.downcase != owner.nick.downcase }.uniq.compact
             mentions = mentions.map { |m| "@#{m}" }.join(" ").strip
             mentions = nil if mentions.strip.size == 0
-            post_update args, mentions, {in_reply_to_status_id: tweet.id, prefix: "."}
+            post_update channel, args, mentions, {in_reply_to_status_id: tweet.id, prefix: "."}
           else
             raise "Tweet #{cache_id_display cache_id} doesn't exist"
           end
