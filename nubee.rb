@@ -946,7 +946,7 @@ class TwitterController < BaseController
           begin
             f_users = @rest_client.unfollow(i)
             f_users.each do |f_user|
-              process_event owner, channel, [:follow, f_user], true
+              process_event owner, channel, [:unfollow, f_user], true
             end
           rescue => e
             print_error channel, e, "ERROR!"
