@@ -734,7 +734,7 @@ class TwitterController < BaseController
       timeline = @rest_client.home_timeline(count: BACKLOG_FETCH_SIZE, tweet_mode: 'extended') + @rest_client.mentions_timeline(count: BACKLOG_FETCH_SIZE, tweet_mode: 'extended') + @rest_client.retweets_of_me(count: BACKLOG_FETCH_SIZE, tweet_mode: 'extended')
       timeline = timeline.uniq.compact.sort { |a, b| a.created_at <=> b.created_at }
       timeline.each do |obj|
-        process_event owner, channel, obj, true
+        process_event owner, channel, [:tweet, obj], true
         @last_received_tweet_id = obj.id if obj.id
       end
       channel.msg owner.control_user, "-End of Backlog-"
@@ -748,7 +748,7 @@ class TwitterController < BaseController
       end
       timeline = timeline.uniq.compact.sort { |a, b| a.created_at <=> b.created_at }
       timeline.each do |obj|
-        process_event owner, channel, obj, true
+        process_event owner, channel, [:tweet, obj], true
         @last_received_tweet_id = obj.id if obj.id
       end
       # channel.msg owner.control_user, "-End of gap-"
@@ -1238,7 +1238,7 @@ class TwitterController < BaseController
         timeline = @rest_client.user_timeline(u, count: n)
         timeline = timeline.uniq.compact.sort { |a,b| a.created_at <=> b.created_at }
         timeline.each do |obj|
-          process_event owner, channel, obj, true, true
+          process_event owner, channel, [:tweet, obj], true, true
         end
         channel.msg owner.control_user, "-End of #{u}'s tweets-"
       end
