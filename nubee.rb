@@ -1238,7 +1238,7 @@ class TwitterController < BaseController
         u = a[0].downcase
         n = (a[1] || "20").to_i rescue 20
         channel.msg owner.control_user, "Fetching #{u}'s tweets..."
-        timeline = @rest_client.user_timeline(u, count: n)
+        timeline = @rest_client.user_timeline(u, count: n, tweet_mode: 'extended')
         timeline = timeline.uniq.compact.sort { |a,b| a.created_at <=> b.created_at }
         timeline.each do |obj|
           process_event owner, channel, [:tweet, obj], true, true
