@@ -535,8 +535,6 @@ class TwitterController < BaseController
     #   configure_client(config, parse_user)
     # end
 
-    start_streaming_channel
-
     @parse_user = parse_user
     @parse_username = parse_username
     get_mute_list
@@ -545,6 +543,8 @@ class TwitterController < BaseController
     owner.control_msg "Welcome!"
     @logged_in = true
     @oauth_step = 0
+
+    start_streaming_channel
   end
 
   def configure_client(config, parse_user)
