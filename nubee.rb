@@ -567,13 +567,13 @@ class TwitterController < BaseController
     when :favorite
       cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
-      source_user = get_twitter_user_from_user_object entity.source
+      source_user = get_twitter_user_from_user_object parent_tweet.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
       render_tweet show_timestamp, channel, source_user, "#{liked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
     when :unfavorite
       cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
-      source_user = get_twitter_user_from_user_object entity.source
+      source_user = get_twitter_user_from_user_object parent_tweet.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
       render_tweet show_timestamp, channel, source_user, "#{unliked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
     when :follow
