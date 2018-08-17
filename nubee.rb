@@ -565,13 +565,13 @@ class TwitterController < BaseController
       cursor_text = get_cursor_text_from_tweet entity
       render_tweet_standard(channel, cursor_text, show_timestamp, entity, twitter_user, "deleted ", true, show_muted)
     when :favorite
-      cid, parent_tweet = get_cache_id_and_entry entity.target_object
+      cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
       source_user = get_twitter_user_from_user_object object.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
       render_tweet show_timestamp, channel, source_user, "#{liked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
     when :unfavorite
-      cid, parent_tweet = get_cache_id_and_entry entity.target_object
+      cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
       source_user = get_twitter_user_from_user_object object.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
