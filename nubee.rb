@@ -554,8 +554,11 @@ class TwitterController < BaseController
     config.access_token_secret = Blowfish.decrypt(BF_KEY, parse_user["authSecret"])
   end
 
-  def process_event owner, channel, object, show_timestamp = false, show_muted = false
+  def process_event owner, channel, object, show_timestamp = false, show_muted = false, refetch: false
     event_name, entity = object
+    
+    entity = @rest_client.status(entity.id, tweet_mode: 'extended') if refetch
+
     case event_name
     when :delete
       twitter_user = get_twitter_user_from_tweet entity
@@ -654,7 +657,7 @@ class TwitterController < BaseController
         @last_id = new_tweet.id
         @last_transact << ['update', new_tweet.id]
 
-        process_event owner, channel, [:tweet, new_tweet]
+        process_event owner, channel, [:tweet, new_tweet], refetch: true
       else
         raise "Unable to post tweet #{final_text.split("\n").first}"
       end
@@ -852,8 +855,8 @@ class TwitterController < BaseController
             if tweet
               rts = @rest_client.retweet(tweet.id)
               rts.each do |rt|
-                @last_transact << ['rt', rt.retweet.id]
-                process_event owner, channel, [:tweet, new_tweet]
+                @last_transact << ['rt', rt.id]
+                process_event owner, channel, [:tweet, rt], refetch: true
               end
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
@@ -1065,7 +1068,7 @@ class TwitterController < BaseController
               end
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
-              process_event owner, channel, [:favorite, tweet], true
+              process_event owner, channel, [:favorite, tweet], true, refetch: true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -1084,12 +1087,12 @@ class TwitterController < BaseController
             if tweet
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
-              process_event owner, channel, [:favorite, tweet], true
+              process_event owner, channel, [:favorite, tweet], true, refetch: true
 
               rts = @rest_client.retweet(tweet.id)
               rts.each do |rt|
                 @last_transact << ['rt', rt.id]
-                process_event owner, channel, [:tweet, rt]
+                process_event owner, channel, [:tweet, rt], refetch: true
               end
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
@@ -1109,7 +1112,7 @@ class TwitterController < BaseController
             if tweet
               @rest_client.favorite(tweet.id)
               @last_transact << ['fv', tweet.id]
-              process_event owner, channel, [:favorite, tweet], true
+              process_event owner, channel, [:favorite, tweet], true, refetch: true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
@@ -1126,7 +1129,7 @@ class TwitterController < BaseController
             cache_id, tweet = extract_cache_id_from_number_or_url i
             if tweet
               @rest_client.unfavorite(tweet.id)
-              process_event owner, channel, [:unfavorite, tweet], true
+              process_event owner, channel, [:unfavorite, tweet], true, refetch: true
             else
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
