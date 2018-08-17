@@ -670,6 +670,13 @@ class TwitterController < BaseController
     end
   end
 
+  def print_error channel, error, prefix
+    channel.msg owner.control_user, "#{prefix} #{e.class.name}: #{e.message}"
+    error.backtrace.each do |bt|
+      channel.msg owner.control_user, "--> #{bt}"
+    end
+  end
+
   def start_thread channel, the_first=true
     @thread = Thread.new do
       first = the_first
@@ -680,12 +687,12 @@ class TwitterController < BaseController
             after_stream_connect(channel, first)
             first = false
           rescue => e
-            channel.msg owner.control_user, "MASSIVE ERROR! #{e.message}"
+            print_error channel, e, "MASSIVE ERROR!"
           end
           sleep 75
         end
       rescue => e
-        channel.msg owner.control_user, "CONNECT ERROR! #{e.message}"
+        print_error channel, e, "CONNECT ERROR!"
       end
     end
   end
@@ -771,7 +778,7 @@ class TwitterController < BaseController
             sleep SEARCH_REFRESH_TIME
           end
         rescue => e
-          channel.msg owner.control_user, "BIG FAIL!!! #{e.message}"
+          print_error channel, e, "BIG FAIL!!!"
         end
       end
     end
@@ -852,7 +859,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -869,7 +876,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -900,7 +907,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end 
       end
@@ -916,7 +923,7 @@ class TwitterController < BaseController
               process_event owner, channel, [:follow, f_user], true
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -930,7 +937,7 @@ class TwitterController < BaseController
               process_event owner, channel, [:follow, f_user], true
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -964,7 +971,7 @@ class TwitterController < BaseController
           rescue Twitter::Error::NotFound => e
             raise "User #{username} does not exist"
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -987,7 +994,7 @@ class TwitterController < BaseController
           rescue Twitter::Error::NotFound => e
             raise "User #{username} does not exist"
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1038,7 +1045,7 @@ class TwitterController < BaseController
           rescue Twitter::Error::NotFound => e
             raise "User #{username} does not exist"
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1088,7 +1095,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1107,7 +1114,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1124,7 +1131,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1251,7 +1258,7 @@ class TwitterController < BaseController
               raise "Tweet #{cache_id_display cache_id} doesn't exist"
             end
           rescue => e
-            channel.msg owner.control_user, "ERROR! #{e.message}"
+            print_error channel, e, "ERROR!"
           end
         end
       end
@@ -1302,7 +1309,7 @@ class TwitterController < BaseController
           end
           channel.msg owner.control_user, "--End of commands list--"
         rescue => e
-          channel.msg owner.control_user, "Some shit happened! #{e.message}"
+          print_error channel, e, "Some shit happened!"
         end
       end
 
