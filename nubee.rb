@@ -670,9 +670,9 @@ class TwitterController < BaseController
     end
   end
 
-  def print_error channel, error, prefix
+  def print_error channel, e, prefix
     channel.msg owner.control_user, "#{prefix} #{e.class.name}: #{e.message}"
-    error.backtrace.each do |bt|
+    e.backtrace.each do |bt|
       channel.msg owner.control_user, "--> #{bt}"
     end
   end
