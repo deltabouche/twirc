@@ -211,6 +211,15 @@ class TwitterController < BaseController
     [sender_user, recipient_user]
   end
 
+  def get_twitter_user_by_screen_name_2
+    twitter_user = get_twitter_user_by_screen_name username.downcase
+    return twitter_user if twitter_user
+    user = @rest_client.user(username)
+    twitter_user = TwitterUser.new(user)
+    @twitter_users << twitter_user
+    twitter_user
+  end
+
   def get_twitter_user_from_tweet tweet
     twitter_user = get_twitter_user_by_screen_name tweet.user.screen_name
     unless twitter_user
@@ -567,13 +576,13 @@ class TwitterController < BaseController
     when :favorite
       cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
-      source_user = get_twitter_user_by_screen_name parent_tweet.source
+      source_user = get_twitter_user_by_screen_name_2 parent_tweet.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
       render_tweet show_timestamp, channel, source_user, "#{liked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
     when :unfavorite
       cid, parent_tweet = get_cache_id_and_entry entity
       twitter_user = get_twitter_user_from_tweet parent_tweet
-      source_user = get_twitter_user_by_screen_name parent_tweet.source
+      source_user = get_twitter_user_by_screen_name_2 parent_tweet.source
       cursor_text = get_cursor_text_from_tweet parent_tweet, cid
       render_tweet show_timestamp, channel, source_user, "#{unliked_word} [#{twitter_user.nick} #{cursor_text}]", parent_tweet, true, show_muted
     when :follow
