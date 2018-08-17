@@ -707,7 +707,7 @@ class TwitterController < BaseController
       #can't retrieve followers for now.. oh well!
     end
     friend_ids = @rest_client.friend_ids
-    friends = @rest_client.users(friend_ids)
+    friends = @rest_client.users(friend_ids.to_a)
     friends.each do |f|
       twitter_user = get_twitter_user_by_screen_name f.screen_name
       puts "#{f.screen_name}"
