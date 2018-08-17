@@ -211,10 +211,10 @@ class TwitterController < BaseController
     [sender_user, recipient_user]
   end
 
-  def get_twitter_user_by_screen_name_2
-    twitter_user = get_twitter_user_by_screen_name username.downcase
+  def get_twitter_user_by_screen_name_2 screen_name
+    twitter_user = get_twitter_user_by_screen_name screen_name.downcase
     return twitter_user if twitter_user
-    user = @rest_client.user(username)
+    user = @rest_client.user(screen_name)
     twitter_user = TwitterUser.new(user)
     @twitter_users << twitter_user
     twitter_user
