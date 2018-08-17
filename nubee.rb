@@ -531,9 +531,9 @@ class TwitterController < BaseController
     @rest_client = Twitter::REST::Client.new do |config|
       configure_client(config, parse_user)
     end
-    @stream_client = Twitter::Streaming::Client.new do |config|
-      configure_client(config, parse_user)
-    end
+    # @stream_client = Twitter::Streaming::Client.new do |config|
+    #   configure_client(config, parse_user)
+    # end
 
     start_streaming_channel
 
@@ -542,7 +542,7 @@ class TwitterController < BaseController
     get_mute_list
     get_prefs
     owner.serv_notice "NickServ", "You are now logged in!"
-    owner.control_msg "Welcome! Waiting for the stream to start..."
+    owner.control_msg "Welcome!"
     @logged_in = true
     @oauth_step = 0
   end
